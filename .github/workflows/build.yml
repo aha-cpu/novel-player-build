@@ -1,0 +1,33 @@
+name: Build APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download Gradle 8.7
+        run: |
+          curl -sL -o gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle.zip
+      - name: Build debug APK
+        run: ./gradle-8.7/bin/gradle assembleDebug --no-daemon
+      - name: Publish APK to apk branch
+        run: |
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git checkout --orphan apk
+          git rm -rf --ignore-unmatch . >/dev/null 2>&1 || true
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk out/novel-player.apk
+          git add -f out/novel-player.apk
+          git commit -m "APK build" || true
+          git push -f origin apk
