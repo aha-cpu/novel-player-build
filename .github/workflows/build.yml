@@ -19,15 +19,17 @@ jobs:
           curl -sL -o gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
           unzip -q gradle.zip
       - name: Build debug APK
-        run: ./gradle-8.7/bin/gradle assembleDebug --no-daemon
-      - name: Publish APK to apk branch
+        run: ./gradle-8.7/bin/gradle assembleDebug --no-daemon > build.log 2>&1 || true
+      - name: Publish result to apk branch
+        if: always()
         run: |
           git config user.name "ci-bot"
           git config user.email "ci-bot@users.noreply.github.com"
           git checkout --orphan apk
           git rm -rf --ignore-unmatch . >/dev/null 2>&1 || true
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/novel-player.apk
-          git add -f out/novel-player.apk
-          git commit -m "APK build" || true
+          cp app/build/outputs/apk/debug/app-debug.apk out/novel-player.apk 2>/dev/null || true
+          cp build.log out/build.log 2>/dev/null || true
+          git add -f out
+          git commit -m "build $(date -u +%s)" || true
           git push -f origin apk
