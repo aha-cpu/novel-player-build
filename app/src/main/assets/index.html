@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>小说播放器</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23a35c26'/%3E%3Cpath d='M32 16c-4-3-10-4-16-4v36c6 0 12 1 16 4 4-3 10-4 16-4V12c-6 0-12 1-16 4z' fill='%23fff8ec'/%3E%3Cpath d='M32 16v36' stroke='%23a35c26' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6efe2; --bg-card:#fffaf0; --bg-input:#f1e9d8;
+  --text:#3d3428; --text-2:#7a6f5d; --accent:#a35c26; --accent-deep:#8a4a1c;
+  --line:#e5dbc8; --hl:#f3e3c2; --shadow:0 2px 10px rgba(80,60,30,.08);
+  --fs:18px; --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+body.dark{
+  --bg:#171310; --bg-card:#201b15; --bg-input:#2b241a;
+  --text:#e0d6c3; --text-2:#94887a; --accent:#d08a4a; --accent-deep:#e09a5a;
+  --line:#332c22; --hl:#2e2618; --shadow:0 2px 10px rgba(0,0,0,.4);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text);
+  font-size:16px; overflow:hidden;
+  padding-top:var(--safe-t); padding-bottom:var(--safe-b);
+  transition:background .25s,color .25s;
+}
+button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer}
+svg{display:block}
+.hidden{display:none!important}
+
+/* ===== 视图容器 ===== */
+.view{position:fixed;inset:0;padding-top:var(--safe-t);padding-bottom:var(--safe-b);display:none}
+.view.active{display:flex;flex-direction:column}
+
+/* ===== 图标 ===== */
+.icon{width:24px;height:24px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex:none}
+.icon-btn:active{background:var(--bg-input)}
+
+/* ===== 书架视图 ===== */
+#view-library{padding:14px 16px;overflow-y:auto}
+.lib-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.lib-head h1{font-size:22px;font-weight:700;letter-spacing:1px}
+.import-card{
+  display:flex;align-items:center;gap:12px;background:var(--bg-card);
+  border:1.5px dashed var(--accent);border-radius:16px;padding:18px 16px;
+  margin-bottom:18px;box-shadow:var(--shadow);
+}
+.import-card .icon{color:var(--accent)}
+.import-card .t1{font-size:16px;font-weight:600}
+.import-card .t2{font-size:13px;color:var(--text-2);margin-top:3px}
+.book-card{
+  background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:12px;
+  box-shadow:var(--shadow);border:1px solid var(--line);
+}
+.book-top{display:flex;align-items:flex-start;gap:10px}
+.book-info{flex:1;min-width:0}
+.book-title{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-meta{font-size:12.5px;color:var(--text-2);margin-top:5px;line-height:1.5}
+.progress-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.progress-bar{flex:1;height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+.progress-pct{font-size:12px;color:var(--text-2);min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.book-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.book-btn{
+  min-height:40px;padding:0 16px;border-radius:20px;font-size:14px;font-weight:600;
+  display:flex;align-items:center;gap:6px;border:1px solid var(--line);
+}
+.book-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.book-btn:active{filter:brightness(.92)}
+.empty-tip{text-align:center;color:var(--text-2);font-size:14px;margin-top:46px;line-height:2}
+
+/* ===== 阅读视图 ===== */
+#view-reader{background:var(--bg)}
+.reader-top{
+  display:flex;align-items:center;gap:4px;padding:8px 8px;
+  border-bottom:1px solid var(--line);background:var(--bg);flex:none;
+}
+.top-info{flex:1;min-width:0;text-align:center}
+.top-title{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-sub{font-size:12px;color:var(--text-2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reader-body{flex:1;overflow-y:auto;padding:18px 20px 24px;-webkit-overflow-scrolling:touch}
+.chapter-head{font-size:calc(var(--fs) + 4px);font-weight:700;text-align:center;margin:6px 0 22px;line-height:1.5}
+.para{
+  font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",STSong,serif;
+  font-size:var(--fs);line-height:1.95;text-indent:2em;margin-bottom:14px;
+  padding:2px 6px;border-radius:8px;color:var(--text);
+}
+.para.reading{background:var(--hl);box-shadow:inset 3px 0 0 var(--accent)}
+.para:active{background:var(--bg-input)}
+.reader-footer{flex:none;background:var(--bg);border-top:1px solid var(--line);padding:6px 8px 8px}
+.ctl-row{display:flex;align-items:center;justify-content:center;gap:10px}
+.ctl-row-2{display:flex;align-items:center;gap:4px;margin-top:4px;overflow-x:auto;padding:0 2px}
+.ctl-row-2::-webkit-scrollbar{display:none}
+.play-btn{
+  width:62px;height:62px;border-radius:50%;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(163,92,38,.35);
+}
+.play-btn:active{transform:scale(.94)}
+.play-btn .icon{width:30px;height:30px}
+.mini-btn{
+  min-width:44px;height:44px;padding:0 12px;border-radius:22px;font-size:13.5px;
+  display:flex;align-items:center;gap:5px;border:1px solid var(--line);color:var(--text);flex:none;
+}
+.mini-btn .icon{width:18px;height:18px}
+.mini-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mini-btn:active{filter:brightness(.92)}
+.ctl-chip{
+  display:flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;
+  border:1px solid var(--line);border-radius:20px;font-size:13px;color:var(--text-2);flex:none;
+}
+.ctl-chip.on{color:var(--accent);border-color:var(--accent)}
+.rate-val{min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
+.rate-row{display:none;align-items:center;gap:10px;padding:8px 14px 2px}
+.rate-row.open{display:flex}
+input[type=range]{flex:1;height:30px;accent-color:var(--accent)}
+
+/* ===== 章节抽屉 ===== */
+.drawer{
+  position:fixed;left:0;right:0;top:0;bottom:0;z-index:30;pointer-events:none;
+  padding-top:var(--safe-t);padding-bottom:var(--safe-b);
+}
+.drawer.open{pointer-events:auto}
+.drawer-mask{position:absolute;inset:0;background:rgba(0,0,0,.45);opacity:0;transition:opacity .25s}
+.drawer.open .drawer-mask{opacity:1}
+.drawer-panel{
+  position:absolute;top:0;bottom:0;left:0;width:min(320px,86vw);background:var(--bg-card);
+  transform:translateX(-102%);transition:transform .25s;display:flex;flex-direction:column;
+  box-shadow:4px 0 20px rgba(0,0,0,.2);
+}
+.drawer.open .drawer-panel{transform:none}
+.dr-head{padding:14px 16px;border-bottom:1px solid var(--line);font-weight:700;font-size:16px;flex:none}
+.dr-list{flex:1;overflow-y:auto;padding:6px}
+.dr-item{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:13px 12px;border-radius:10px;font-size:14px;
+}
+.dr-item:active{background:var(--bg-input)}
+.dr-item.cur{color:var(--accent);font-weight:600}
+.dr-item .dr-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.dr-item .dr-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+
+/* ===== 设置抽屉（右侧） ===== */
+.drawer-panel.right{left:auto;right:0;transform:translateX(102%);box-shadow:-4px 0 20px rgba(0,0,0,.2)}
+.drawer.open .drawer-panel.right{transform:none}
+.set-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.set-label{font-size:14.5px}
+.set-sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.switch{position:relative;width:48px;height:28px;border-radius:14px;background:var(--bg-input);transition:background .2s;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.switch.on{background:var(--accent)}
+.switch.on::after{left:23px}
+.fs-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.fs-btns{display:flex;gap:8px}
+.fs-btn{min-width:40px;height:40px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:600}
+.fs-btn:active{background:var(--bg-input)}
+select.voice-sel{
+  max-width:52%;background:var(--bg-input);color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:9px 8px;font-size:13.5px;font-family:inherit;outline:none;
+}
+.toast{
+  position:fixed;left:50%;bottom:calc(18% + var(--safe-b));transform:translateX(-50%) translateY(10px);
+  background:rgba(40,32,22,.92);color:#f5efe2;padding:10px 18px;border-radius:22px;font-size:13.5px;
+  opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:80vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%)}
+@media (min-width:768px){
+  #view-library{max-width:720px;margin:0 auto}
+  #view-reader{max-width:760px;margin:0 auto;box-shadow:var(--shadow)}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 书架视图 ===== -->
+<div id="view-library" class="view active">
+  <div class="lib-head">
+    <h1>我的书架</h1>
+    <button class="icon-btn" id="btn-theme-top" title="切换深浅色" aria-label="切换深浅色">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.5-.05-1-.14-1.48A7 7 0 0 1 12 3z"/></svg>
+    </button>
+  </div>
+  <button class="import-card" id="btn-import" style="width:100%;text-align:left">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+    <div>
+      <div class="t1">导入小说（.txt 文本文档）</div>
+      <div class="t2">支持 UTF-8 / GBK 编码，自动识别章节</div>
+    </div>
+  </button>
+  <div id="book-list"></div>
+  <div class="empty-tip" id="empty-tip">书架还是空的<br>点击上方按钮导入一本 TXT 小说开始听书</div>
+  <input type="file" id="file-input" accept=".txt,text/plain" class="hidden">
+</div>
+
+<!-- ===== 阅读视图 ===== -->
+<div id="view-reader" class="view">
+  <div class="reader-top">
+    <button class="icon-btn" id="btn-back" aria-label="返回书架">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="top-info">
+      <div class="top-title" id="top-title">书名</div>
+      <div class="top-sub" id="top-sub">章节</div>
+    </div>
+    <button class="icon-btn" id="btn-toc" aria-label="目录">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-settings" aria-label="设置">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+    </button>
+  </div>
+  <div class="reader-body" id="reader-body"></div>
+  <div class="reader-footer">
+    <div class="rate-row" id="rate-row">
+      <span class="rate-val" id="rate-min">0.5x</span>
+      <input type="range" id="rate-slider" min="0.5" max="2" step="0.1" value="1">
+      <span class="rate-val" id="rate-val">1.0x</span>
+    </div>
+    <div class="ctl-row">
+      <button class="icon-btn" id="btn-prev-ch" aria-label="上一章">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M18 5l-8 7 8 7z"/></svg>
+      </button>
+      <button class="play-btn" id="btn-play" aria-label="播放">
+        <svg class="icon" id="ic-play" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M8 5.5v13l11-6.5z"/></svg>
+        <svg class="icon hidden" id="ic-pause" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-next-ch" aria-label="下一章">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M6 5l8 7-8 7z"/></svg>
+      </button>
+    </div>
+    <div class="ctl-row-2">
+      <button class="mini-btn" id="btn-rate"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>语速</button>
+      <button class="mini-btn" id="btn-voice"><svg class="icon" viewBox="0 0 24 24"><path d="M9 18v-6a3 3 0 1 1 6 0v6a3 3 0 1 1-6 0z"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>音色</button>
+      <button class="mini-btn" id="btn-fs-a"><svg class="icon" viewBox="0 0 24 24"><path d="M4 19h16M4 14h16M4 9h16"/></svg>A-</button>
+      <button class="mini-btn" id="btn-fs-b"><svg class="icon" viewBox="0 0 24 24"><path d="M4 19h16M4 14h16M4 9h16"/></svg>A+</button>
+      <button class="mini-btn" id="btn-keep"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>常亮</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 目录抽屉 ===== -->
+<div class="drawer" id="drawer-toc">
+  <div class="drawer-mask" data-close="drawer-toc"></div>
+  <div class="drawer-panel">
+    <div class="dr-head">目录</div>
+    <div class="dr-list" id="toc-list"></div>
+  </div>
+</div>
+
+<!-- ===== 设置抽屉 ===== -->
+<div class="drawer" id="drawer-set">
+  <div class="drawer-mask" data-close="drawer-set"></div>
+  <div class="drawer-panel right">
+    <div class="dr-head">设置</div>
+    <div class="set-item">
+      <div><div class="set-label">语速</div><div class="set-sub">当前 <span id="set-rate-val">1.0x</span></div></div>
+      <input type="range" id="set-rate" min="0.5" max="2" step="0.1" value="1" style="width:120px;accent-color:var(--accent)">
+    </div>
+    <div class="set-item">
+      <div><div class="set-label">朗读音色</div><div class="set-sub">系统语音引擎</div></div>
+      <select class="voice-sel" id="voice-sel"></select>
+    </div>
+    <div class="fs-row">
+      <div class="set-label">字号</div>
+      <div class="fs-btns">
+        <button class="fs-btn" id="set-fs-a">A-</button>
+        <button class="fs-btn" id="set-fs-b">A+</button>
+      </div>
+    </div>
+    <div class="set-item">
+      <div><div class="set-label">深色模式</div><div class="set-sub">夜间阅读更护眼</div></div>
+      <div class="switch" id="set-dark"></div>
+    </div>
+    <div class="set-item">
+      <div><div class="set-label">屏幕常亮</div><div class="set-sub">听书时保持屏幕不熄灭</div></div>
+      <div class="switch" id="set-keep"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== 工具 ===================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function fmtSize(n){
+  if(n < 1024) return n + ' B';
+  if(n < 1048576) return (n/1024).toFixed(0) + ' KB';
+  return (n/1048576).toFixed(1) + ' MB';
+}
+const SET = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ===================== IndexedDB 书库 ===================== */
+let db = null;
+function openDB(){
+  return new Promise((res, rej)=>{
+    const rq = indexedDB.open('novel-player-db', 1);
+    rq.onupgradeneeded = e => {
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('books')){
+        d.createObjectStore('books', { keyPath:'id' });
+      }
+    };
+    rq.onsuccess = e => { db = e.target.result; res(); };
+    rq.onerror = () => rej(rq.error);
+  });
+}
+function dbPut(book){ return new Promise((res,rej)=>{ const t = db.transaction('books','readwrite'); t.objectStore('books').put(book); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }
+function dbGet(id){ return new Promise((res,rej)=>{ const rq = db.transaction('books').objectStore('books').get(id); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
+function dbAll(){ return new Promise((res,rej)=>{ const rq = db.transaction('books').objectStore('books').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>rej(rq.error); }); }
+function dbDel(id){ return new Promise((res,rej)=>{ const t = db.transaction('books','readwrite'); t.objectStore('books').delete(id); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }
+
+/* ===================== 文本解码（UTF-8 / GBK） ===================== */
+function decodeTxt(buf){
+  const u8 = new Uint8Array(buf);
+  if(u8.length >= 3 && u8[0]===0xEF && u8[1]===0xBB && u8[2]===0xBF) return new TextDecoder('utf-8').decode(u8.subarray(3));
+  try{ return new TextDecoder('utf-8', {fatal:true}).decode(u8); }
+  catch(e){
+    try{ return new TextDecoder('gbk').decode(u8); }
+    catch(e2){ return new TextDecoder('utf-8').decode(u8); }
+  }
+}
+
+/* ===================== 自动分章 ===================== */
+const CH_RE = /^\s*(?:第\s*[0-9零〇一二三四五六七八九十百千万两]+\s*[章回节卷集部篇话]|[0-9零〇一二三四五六七八九十百千万两]+\s*[、.．]\s*\S|Chapter\s*\d+|楔子|序章|序言|前言|引子|尾声|终章|后记|番外[^\n]{0,20})\s*[：:\s]?\S{0,40}\s*$/;
+function splitChapters(title, text){
+  text = text.replace(/\r\n?/g, '\n');
+  const lines = text.split('\n');
+  const chapters = []; let cur = null;
+  const pushCur = () => { if(cur && cur.lines.length){ cur.text = cur.lines.join('\n').trim(); if(cur.text) chapters.push(cur); } };
+  for(const ln of lines){
+    if(CH_RE.test(ln) && ln.trim().length <= 60){
+      pushCur(); cur = { title: ln.trim(), lines: [] };
+    } else if(cur){ cur.lines.push(ln); }
+    else { cur = { title:'开篇', lines:[ln] }; }
+  }
+  pushCur();
+  if(!chapters.length){
+    const t = text.trim();
+    if(t) chapters.push({ title:'全文', lines:[t], text:t });
+  }
+  return chapters.map(c => ({ title:c.title, text:c.text }));
+}
+
+/* ===================== 导入 ===================== */
+$('#btn-import').addEventListener('click', ()=> $('#file-input').click());
+$('#file-input').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  if(f.size > 40*1048576){ toast('文件太大，请选择 40MB 以内的 TXT'); return; }
+  toast('正在导入…');
+  const buf = await f.arrayBuffer();
+  const text = decodeTxt(buf);
+  const chapters = splitChapters(f.name, text);
+  if(!chapters.length){ toast('未识别到正文内容'); return; }
+  const book = {
+    id: 'b' + Date.now() + Math.random().toString(36).slice(2,6),
+    title: f.name.replace(/\.txt$/i, ''),
+    size: f.size, addedAt: Date.now(), chapters
+  };
+  await dbPut(book);
+  SET.set('progress:' + book.id, { ch:0, para:0 });
+  toast('已导入「' + book.title + '」');
+  renderLibrary();
+});
+
+/* ===================== 书架渲染 ===================== */
+async function renderLibrary(){
+  const books = (await dbAll()).sort((a,b)=>b.addedAt-a.addedAt);
+  const list = $('#book-list'); const tip = $('#empty-tip');
+  tip.classList.toggle('hidden', books.length > 0);
+  list.innerHTML = books.map(b => {
+    const p = SET.get('progress:' + b.id, { ch:0, para:0 });
+    const total = b.chapters.length;
+    const pct = total ? Math.min(100, Math.round(((p.ch + (p.para>0?0.4:0)) / total) * 100)) : 0;
+    const chTitle = b.chapters[Math.min(p.ch, total-1)]?.title || '';
+    return `<div class="book-card" data-id="${b.id}">
+      <div class="book-top">
+        <div class="book-info">
+          <div class="book-title">${esc(b.title)}</div>
+          <div class="book-meta">${total} 章 · ${fmtSize(b.size)}<br>上次读到：${esc(chTitle)}</div>
+        </div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <span class="progress-pct">${pct}%</span>
+      </div>
+      <div class="book-actions">
+        <button class="book-btn" data-act="del">删除</button>
+        <button class="book-btn primary" data-act="open">
+          <svg class="icon" style="width:16px;height:16px" viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 7h8M8 12h5"/></svg>
+          ${pct>0 ? '继续听书' : '开始听书'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.book-card').forEach(card => {
+    const id = card.dataset.id;
+    card.querySelector('[data-act="open"]').addEventListener('click', ()=> openBook(id));
+    card.querySelector('[data-act="del"]').addEventListener('click', async ()=>{
+      if(!confirm('确定删除这本书？朗读进度也会清除。')) return;
+      await dbDel(id); localStorage.removeItem('progress:' + id); renderLibrary();
+    });
+  });
+}
+
+/* ===================== TTS 引擎封装 ===================== */
+const TTS = {
+  mode: null, ready: false, _cbs: [],
+  onReady(cb){ this.ready ? cb() : this._cbs.push(cb); },
+  _fireReady(){ this.ready = true; this._cbs.forEach(cb=>cb()); this._cbs = []; },
+  init(){
+    if(window.AndroidBridge){ this.mode = 'native'; }
+    else if('speechSynthesis' in window){ this.mode = 'web'; }
+    else { this.mode = null; return; }
+    if(this.mode === 'native'){
+      const vs = window.AndroidBridge.ttsGetVoices();
+      if(vs){ try{ this._voices = JSON.parse(vs); this._fireReady(); }catch(e){} }
+      window.AndroidBridge.ttsInit();
+    } else {
+      const load = () => { this._voices = speechSynthesis.getVoices(); this._fireReady(); };
+      load(); speechSynthesis.onvoiceschanged = load;
+      setTimeout(()=>{ if(!this.ready) load(); }, 800);
+    }
+  },
+  getVoices(){
+    if(this.mode === 'web'){
+      const zh = this._voices.filter(v=>/^zh/i.test(v.lang));
+      return (zh.length ? zh : this._voices).map(v => ({ name:v.name, label:v.name + (v.lang?' ('+v.lang+')':'') }));
+    }
+    return (this._voices || []).map(v => ({ name:v.name, label:v.label || v.name }));
+  },
+  speak(text, idx, rate, voiceName){
+    if(this.mode === 'native'){
+      window.AndroidBridge.ttsSpeak(text, String(idx), rate, 1.0, voiceName || '');
+    } else {
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = rate; u.pitch = 1;
+      const v = this._voices.find(v=>v.name === voiceName);
+      if(v) u.voice = v;
+      u.onstart = ()=> window.__onTtsStart(String(idx));
+      u.onerror = ()=> window.__onTtsError('web-err');
+      speechSynthesis.speak(u);
+    }
+  },
+  stop(){
+    if(this.mode === 'native'){ try{ window.AndroidBridge.ttsStop(); }catch(e){} }
+    else if(this.mode === 'web'){ speechSynthesis.cancel(); }
+  }
+};
+
+/* 原生 TTS 回调（Android WebView 注入调用） */
+window.__onTtsReady = v => { if(v){ try{ TTS._voices = JSON.parse(v); }catch(e){} } TTS._fireReady(); };
+window.__onTtsStart = idx => { if(R.playing){ Reader.onStart(+idx); } };
+window.__onTtsDone = () => { if(R.playing){ Reader.nextChapter(); } };
+window.__onTtsError = () => { if(R.playing){ Reader.stop('朗读出错，已停止'); } };
+
+/* ===================== 阅读器状态 ===================== */
+const R = {
+  book:null, ch:0, para:0,
+  playing:false, lastStarted:-1,
+  rate: SET.get('rate', 1), fs: SET.get('fs', 18),
+  dark: SET.get('dark', false), keep: SET.get('keep', false),
+  voice: SET.get('voice', ''), voicesLoaded:false,
+  lastUserScroll:0
+};
+const LIMIT_QUEUE = 600;
+
+const Reader = {
+  async openBook(id){
+    const book = await dbGet(id);
+    if(!book){ toast('书不存在'); return; }
+    R.book = book;
+    const p = SET.get('progress:' + id, { ch:0, para:0 });
+    R.ch = Math.min(p.ch, book.chapters.length-1);
+    R.para = Math.min(p.para, 99999);
+    R.lastStarted = -1; R.playing = false;
+    $('#view-library').classList.remove('active');
+    $('#view-reader').classList.add('active');
+    this.renderChapter(true);
+    this.renderToc();
+  },
+  back(){
+    this.stop();
+    $('#view-reader').classList.remove('active');
+    $('#view-library').classList.add('active');
+    renderLibrary();
+  },
+  renderChapter(scrollToPara){
+    const ch = R.book.chapters[R.ch];
+    const paras = ch.text.split('\n').map(s=>s.trim()).filter(Boolean);
+    R.chapterParas = paras;
+    if(R.para >= paras.length) R.para = 0;
+    $('#top-title').textContent = R.book.title;
+    $('#top-sub').textContent = ch.title + ' · ' + (R.ch+1) + '/' + R.book.chapters.length;
+    $('#reader-body').innerHTML =
+      `<div class="chapter-head">${esc(ch.title)}</div>` +
+      paras.map((t,i)=>`<p class="para" data-i="${i}">${esc(t)}</p>`).join('');
+    const body = $('#reader-body');
+    body.querySelectorAll('.para').forEach(el => {
+      el.addEventListener('click', ()=> this.jumpToPara(+el.dataset.i, R.playing));
+    });
+    if(scrollToPara){
+      const el = body.querySelector(`[data-i="${R.para}"]`);
+      if(el) el.scrollIntoView({ block:'center' });
+    }
+  },
+  renderToc(){
+    $('#toc-list').innerHTML = R.book.chapters.map((c,i)=>
+      `<div class="dr-item ${i===R.ch?'cur':''}" data-i="${i}">
+        <span class="dr-name">${esc(c.title)}</span>${i===R.ch?'<span class="dr-dot"></span>':''}
+      </div>`).join('');
+    $('#toc-list').querySelectorAll('.dr-item').forEach(el => {
+      el.addEventListener('click', ()=>{
+        closeDrawer('drawer-toc');
+        const wasPlaying = R.playing;
+        this.stop();
+        R.ch = +el.dataset.i; R.para = 0; R.lastStarted = -1;
+        this.renderChapter(true); this.renderToc();
+        if(wasPlaying) this.play();
+      });
+    });
+  },
+  jumpToPara(i, resume){
+    this.stop();
+    R.para = i; R.lastStarted = -1;
+    if(resume) this.play();
+    else this.highlight(i, true);
+  },
+  highlight(i, forceScroll){
+    const el = $('#reader-body').querySelector(`[data-i="${i}"]`);
+    if(!el) return;
+    $('#reader-body').querySelectorAll('.para.reading').forEach(e=>e.classList.remove('reading'));
+    el.classList.add('reading');
+    const since = Date.now() - R.lastUserScroll;
+    if(forceScroll || since > 4000){
+      try{ el.scrollIntoView({ block:'center', behavior:'smooth' }); }catch(e){ el.scrollIntoView(); }
+    }
+  },
+  play(){
+    if(!R.book || !R.chapterParas){ return; }
+    let readyTimer = setTimeout(()=>{ if(!R.playing) toast('语音引擎未就绪，请检查手机系统语音设置'); }, 3000);
+    TTS.onReady(()=>{
+      clearTimeout(readyTimer);
+      this.stop();
+      R.playing = true;
+      const start = R.lastStarted >= 0 ? R.lastStarted : R.para;
+      if(start >= R.chapterParas.length) R.para = 0;
+      R.para = start; R.lastStarted = -1;
+      const paras = R.chapterParas;
+      if(paras.length > LIMIT_QUEUE){ this.stop('本章段落过多，暂不支持整章朗读'); return; }
+      let rate = R.rate;
+      for(let i = start; i < paras.length; i++){
+        TTS.speak(paras[i], i, rate, R.voice);
+      }
+      if(TTS.mode === 'native'){ try{ window.AndroidBridge.ttsMarkQueueActive(); }catch(e){} }
+      this.setPlayUI();
+      this.saveProgress();
+    });
+  },
+  stop(msg){
+    const was = R.playing;
+    R.playing = false;
+    TTS.stop();
+    this.setPlayUI();
+    if(msg) toast(msg);
+    return was;
+  },
+  setPlayUI(){
+    $('#ic-play').classList.toggle('hidden', R.playing);
+    $('#ic-pause').classList.toggle('hidden', !R.playing);
+  },
+  onStart(idx){
+    R.para = idx; R.lastStarted = idx;
+    this.highlight(idx, false);
+    this.saveProgress();
+  },
+  saveProgress(){
+    if(!R.book) return;
+    SET.set('progress:' + R.book.id, { ch:R.ch, para:R.lastStarted>=0?R.lastStarted:R.para });
+  },
+  prevChapter(){
+    if(R.ch <= 0){ toast('已是第一章'); return; }
+    const was = this.stop();
+    R.ch--; R.para = 0; R.lastStarted = -1;
+    this.renderChapter(true); this.renderToc();
+    if(was) this.play();
+  },
+  nextChapter(){
+    if(R.ch >= R.book.chapters.length-1){ toast('已是最后一章'); this.stop(); return; }
+    const was = this.stop();
+    R.ch++; R.para = 0; R.lastStarted = -1;
+    this.renderChapter(true); this.renderToc();
+    if(was) this.play();
+  },
+  setRate(v){
+    R.rate = v; SET.set('rate', v);
+    $('#rate-val').textContent = v.toFixed(1) + 'x';
+    $('#set-rate-val').textContent = v.toFixed(1) + 'x';
+    $('#rate-slider').value = v; $('#set-rate').value = v;
+    if(R.playing) this.play();
+  },
+  setVoice(name){
+    R.voice = name; SET.set('voice', name);
+    $('#voice-sel').value = name;
+    if(R.playing) this.play();
+  },
+  setFs(delta){
+    R.fs = Math.min(26, Math.max(14, R.fs + delta));
+    SET.set('fs', R.fs);
+    document.documentElement.style.setProperty('--fs', R.fs + 'px');
+  },
+  setDark(on){
+    R.dark = on; SET.set('dark', on);
+    document.body.classList.toggle('dark', on);
+    $('#set-dark').classList.toggle('on', on);
+    $('#btn-theme-top').innerHTML = on
+      ? '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>'
+      : '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.5-.05-1-.14-1.48A7 7 0 0 1 12 3z"/></svg>';
+  },
+  setKeep(on){
+    R.keep = on; SET.set('keep', on);
+    $('#set-keep').classList.toggle('on', on);
+    $('#btn-keep').classList.toggle('active', on);
+    if(TTS.mode === 'native'){ try{ window.AndroidBridge.ttsSetKeepScreenOn(on); }catch(e){} }
+    else if(on){ toast('屏幕常亮仅在 App 中生效'); }
+  },
+  fillVoices(){
+    if(R.voicesLoaded) return;
+    TTS.onReady(()=>{
+      const vs = TTS.getVoices();
+      const sel = $('#voice-sel');
+      sel.innerHTML = vs.map(v=>`<option value="${esc(v.name)}">${esc(v.label)}</option>`).join('');
+      if(R.voice && vs.some(v=>v.name===R.voice)) sel.value = R.voice;
+      else if(vs.length){ R.voice = vs[0].name; sel.value = R.voice; }
+      R.voicesLoaded = true;
+    });
+  }
+};
+
+/* ===================== 事件绑定 ===================== */
+$('#btn-back').addEventListener('click', ()=> Reader.back());
+$('#btn-play').addEventListener('click', ()=>{ R.playing ? Reader.stop() : Reader.play(); });
+$('#btn-prev-ch').addEventListener('click', ()=> Reader.prevChapter());
+$('#btn-next-ch').addEventListener('click', ()=> Reader.nextChapter());
+$('#btn-toc').addEventListener('click', ()=> openDrawer('drawer-toc'));
+$('#btn-settings').addEventListener('click', ()=> openDrawer('drawer-set'));
+
+$('#btn-rate').addEventListener('click', ()=> $('#rate-row').classList.toggle('open'));
+$('#rate-slider').addEventListener('input', e=>{ $('#rate-val').textContent = (+e.target.value).toFixed(1) + 'x'; $('#set-rate-val').textContent = (+e.target.value).toFixed(1) + 'x'; });
+$('#rate-slider').addEventListener('change', e=> Reader.setRate(+e.target.value));
+$('#set-rate').addEventListener('input', e=>{ $('#set-rate-val').textContent = (+e.target.value).toFixed(1) + 'x'; $('#rate-val').textContent = (+e.target.value).toFixed(1) + 'x'; });
+$('#set-rate').addEventListener('change', e=> Reader.setRate(+e.target.value));
+$('#voice-sel').addEventListener('change', e=> Reader.setVoice(e.target.value));
+$('#btn-fs-a').addEventListener('click', ()=> Reader.setFs(-1));
+$('#btn-fs-b').addEventListener('click', ()=> Reader.setFs(+1));
+$('#set-fs-a').addEventListener('click', ()=> Reader.setFs(-1));
+$('#set-fs-b').addEventListener('click', ()=> Reader.setFs(+1));
+$('#btn-keep').addEventListener('click', ()=> Reader.setKeep(!R.keep));
+$('#set-keep').addEventListener('click', ()=> Reader.setKeep(!R.keep));
+$('#set-dark').addEventListener('click', ()=> Reader.setDark(!R.dark));
+$('#btn-theme-top').addEventListener('click', ()=> Reader.setDark(!R.dark));
+
+function openDrawer(id){ $('#'+id).classList.add('open'); }
+function closeDrawer(id){ $('#'+id).classList.remove('open'); }
+document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', ()=> closeDrawer(el.dataset.close)));
+$('#reader-body').addEventListener('scroll', ()=>{ R.lastUserScroll = Date.now(); }, { passive:true });
+
+/* ===================== 启动 ===================== */
+(async function init(){
+  await openDB();
+  document.documentElement.style.setProperty('--fs', R.fs + 'px');
+  Reader.setDark(R.dark);
+  Reader.setKeep(R.keep);
+  Reader.setRate(R.rate);
+  TTS.init();
+  Reader.fillVoices();
+  renderLibrary();
+})();
+</script>
+</body>
+</html>
