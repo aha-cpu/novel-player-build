@@ -1,0 +1,38 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.novel.player'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.novel.player"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../release.keystore')
+            storePassword 'novelplayer2026'
+            keyAlias 'novelplayer'
+            keyPassword 'novelplayer2026'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+}
